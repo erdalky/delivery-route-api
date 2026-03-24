@@ -12,33 +12,32 @@ from openai import OpenAI
 
 # --- API KEYS ---
 GOOGLE_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY') 
-
-print("\n" + "="*50)
-print(f"🚀 SUNUCU BAŞLIYOR...")
-print(f"🔑 Google Key Okundu Mu?: {'EVET' if GOOGLE_API_KEY else 'HAYIR (None)'}")
-print(f"🔑 OpenAI Key Okundu Mu?: {'EVET' if OPENAI_API_KEY else 'HAYIR (None)'}")
-print("="*50 + "\n")
+# Replace with your actual OpenAI Key
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
 app = FastAPI(title="Delivery Driver Route Assistant")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class RouteRequest(BaseModel):
     locations: List[str]
     forced_indices: Optional[List[int]] = []
     times: Optional[List[str]] = []
 
+
 client = OpenAI(api_key=OPENAI_API_KEY)
+
 
 # --- GOOGLE PLACES DATA ENRICHMENT ---
 def get_place_details(address: str) -> Dict:
+    """Fetches formatted address and location types (e.g., school, establishment)"""
     url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
     params = {
         'input': address,
@@ -54,12 +53,10 @@ def get_place_details(address: str) -> Dict:
                 "address": candidate['formatted_address'],
                 "types": candidate.get('types', [])
             }
-        else:
-            print(f"🚨 GOOGLE PLACES HATASI ({address}): {response}")
-            return {"address": address, "types": []}
-    except Exception as e:
-        print(f"🚨 GOOGLE PLACES BAĞLANTI HATASI: {e}")
         return {"address": address, "types": []}
+    except:
+        return {"address": address, "types": []}
+
 
 def get_google_distance_matrix(locations: List[str], departure_timestamp: float):
     locations_str = "|".join(locations)
@@ -70,14 +67,10 @@ def get_google_distance_matrix(locations: List[str], departure_timestamp: float)
     }
     try:
         response = requests.get(url, params=params).json()
-        if response.get('status') == 'OK':
-            return response
-        else:
-            print(f"🚨 GOOGLE MATRIX HATASI: {response}")
-            return None
-    except Exception as e:
-        print(f"🚨 GOOGLE MATRIX BAĞLANTI HATASI: {e}")
+        return response if response.get('status') == 'OK' else None
+    except:
         return None
+
 
 def parse_matrix(data):
     matrix = []
@@ -91,6 +84,7 @@ def parse_matrix(data):
                 row_list.append(int(duration['value']) if duration else 0)
         matrix.append(row_list)
     return matrix
+
 
 def solve_route(matrix, num_locations, forced_indices):
     try:
@@ -113,7 +107,7 @@ def solve_route(matrix, num_locations, forced_indices):
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
         search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-        search_parameters.time_limit.seconds = 3 
+        search_parameters.time_limit.seconds = 3
 
         solution = routing.SolveWithParameters(search_parameters)
         if solution:
@@ -124,52 +118,61 @@ def solve_route(matrix, num_locations, forced_indices):
                 index = solution.Value(routing.NextVar(index))
             ordered_indices.append(manager.IndexToNode(index))
             return solution.ObjectiveValue(), ordered_indices
-        print("🚨 OR-TOOLS ÇÖZÜM BULAMADI (Matris hatalı olabilir)")
         return None, None
-    except Exception as e:
-        print(f"🚨 OR-TOOLS HATASI: {e}")
+    except:
         return None, None
 
+
+# --- TACTICAL DELIVERY AI INSIGHTS ---
 def get_ai_delivery_insights(route_details: List[Dict], duration_mins: int, start_time: str) -> str:
+    """Generates delivery-specific tactical advice using location context"""
+    print(f"\n[AI] Generating tactical briefing for {len(route_details)} stops...")
+
     route_summary = ""
     for i, loc in enumerate(route_details):
         type_info = ", ".join(loc['types'][:3]) if loc['types'] else "Unknown"
-        route_summary += f"Stop {i+1}: {loc['address']} (Type: {type_info})\n"
+        route_summary += f"Stop {i + 1}: {loc['address']} (Type: {type_info})\n"
 
     prompt = f"""
-    You are a professional Delivery Dispatcher. 
-    Analyze this route for a delivery driver:
-    {route_summary}
-    
-    Total Drive Time: {duration_mins} mins. Start: {start_time}.
+        You are a professional Delivery Dispatcher. 
+        Analyze this route for a delivery driver:
+        {route_summary}
 
-    STRICT INSTRUCTIONS:
-    1. For each stop, provide ONLY a plain text time delay prediction based on the location type (e.g., Stop 5: +10 mins for university parking).
-    2. Do NOT use any bold text, asterisks (*), or special formatting characters.
-    3. AFTER the list of stops, add exactly 2-3 sentences of general road assessment and a specific break suggestion based on the total duration ({duration_mins} mins).
-    4. Keep the entire response extremely clean and easy to read on a mobile screen.
-    """
+        Total Drive Time: {duration_mins} mins. Start: {start_time}.
+
+        STRICT INSTRUCTIONS:
+        1. For each stop, provide ONLY a plain text time delay prediction (e.g., Stop 5: +10 mins for university parking).
+        2. Do NOT use any bold text, asterisks (*), or special formatting characters.
+        3. AFTER the list of stops, add exactly 2-3 sentences of general road assessment and a specific break suggestion based on the total duration ({duration_mins} mins).
+        4. Keep the entire response extremely clean and easy to read on a mobile screen.
+        """
+
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",  # Recommended for better local reasoning
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
             max_tokens=400
         )
+        print("[AI] Tactical briefing generated successfully.")
         return response.choices[0].message.content
     except Exception as e:
-        print(f"🚨 OPENAI HATASI: {e}")
-        return "Tactical briefing unavailable."
+        print(f"🚨 OPENAI ERROR: {e}")
+        return "Tactical briefing unavailable. Please proceed with caution."
 
+
+# --- MAIN API ENDPOINT ---
 @app.post("/optimize")
 def optimize_route(request: RouteRequest):
-    print(f"\n🚀 YENİ İSTEK GELDİ: {len(request.locations)} lokasyon")
     if len(request.locations) < 2:
         raise HTTPException(status_code=400, detail="Minimum 2 locations required.")
 
+    print("\n[Step 1] Verifying addresses and fetching location types...")
+    # Enrichment: Get details for all locations
     verified_data = [get_place_details(loc) for loc in request.locations]
     verified_addresses = [d['address'] for d in verified_data]
 
+    # Traffic timestamps
     if not request.times:
         test_timestamps = [("Live Traffic", datetime.now().timestamp())]
     else:
@@ -183,6 +186,7 @@ def optimize_route(request: RouteRequest):
             except:
                 continue
 
+    print("[Step 2] Calculating optimal sequence...")
     results = []
     for label, ts in test_timestamps:
         raw_data = get_google_distance_matrix(verified_addresses, ts)
@@ -193,22 +197,25 @@ def optimize_route(request: RouteRequest):
                 results.append({'time': label, 'duration': cost, 'indices': indices})
 
     if not results:
-        print("🚨 HİÇBİR ROTA BULUNAMADI, 404 DÖNDÜRÜLÜYOR")
         raise HTTPException(status_code=404, detail="No valid route found.")
 
     best = min(results, key=lambda x: x['duration'])
+
+    # Re-order the enriched data based on the solved indices
     final_ordered_details = [verified_data[i] for i in best['indices']]
     final_route_addresses = [d['address'] for d in final_ordered_details]
     duration_mins = best['duration'] // 60
 
+    # Get AI Insights
     ai_insights = get_ai_delivery_insights(final_ordered_details, duration_mins, best['time'])
 
+    # Prepare Google Maps Link
     origin = urllib.parse.quote(final_route_addresses[0])
     destination = urllib.parse.quote(final_route_addresses[-1])
     waypoints = urllib.parse.quote("|".join(final_route_addresses[1:-1]))
     url = f"https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}&waypoints={waypoints}&travelmode=driving"
 
-    print("✅ İŞLEM BAŞARILI, YANIT GÖNDERİLİYOR\n")
+    print("[Step 3] Success. Sending payload to frontend.\n")
     return {
         "status": "success",
         "suggested_start_time": best['time'],
