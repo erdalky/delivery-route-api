@@ -9,7 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        /* Eski CSS sınıflarını (draggable, dragging) sildik çünkü SortableJS bunu otomatik yapıyor */
+        /* Dokunmatik ekranlarda sürükleme yaparken ekranın titremesini önler */
+        .drag-handle { touch-action: none; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -50,7 +51,7 @@ The University of Texas at Austin, TX"></textarea>
 
             <p class="text-xs text-gray-500 mb-4 flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11V7a5 5 0 0110 0v4m-5 4h.01M12 21a9 9 0 100-18 9 9 0 000 18z"></path></svg>
-                Drag and drop items to reorder.
+                Hold the icon to drag and reorder on mobile.
             </p>
 
             <ul id="routeList" class="space-y-2 mb-4">
@@ -138,10 +139,9 @@ The University of Texas at Austin, TX"></textarea>
 
             routeArray.forEach((addr, index) => {
                 const li = document.createElement('li');
-                // Eski 'draggable' attribute'unu ve listener'ları kaldırdık. Sadece imleç (cursor) stilini tutuyoruz.
-                li.className = "cursor-grab bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 shadow-sm hover:shadow transition";
+                li.className = "bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 shadow-sm hover:shadow transition";
                 li.innerHTML = `
-                    <div class="text-gray-400 hover:text-gray-600">
+                    <div class="drag-handle p-2 -ml-2 cursor-grab text-gray-400 hover:text-gray-600">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 2a2 2 0 10-4 0 2 2 0 004 0zm7 0a2 2 0 10-4 0 2 2 0 004 0zm-7 8a2 2 0 10-4 0 2 2 0 004 0zm7 0a2 2 0 10-4 0 2 2 0 004 0zm-7 8a2 2 0 10-4 0 2 2 0 004 0zm7 0a2 2 0 10-4 0 2 2 0 004 0z"></path></svg>
                     </div>
                     <span class="address-text text-sm font-medium text-slate-700 flex-1">${addr}</span>
@@ -158,15 +158,17 @@ The University of Texas at Austin, TX"></textarea>
             updateGoogleMapsLink();
         }
 
-        // --- YENİ: SortableJS ile Mobil Uyumlu Drag & Drop ---
+        // --- SortableJS ile Mobil Uyumlu Drag & Drop ---
         const listContainer = document.getElementById('routeList');
         
         new Sortable(listContainer, {
-            animation: 150, // Sürüklerken pürüzsüz kayma animasyonu
-            ghostClass: 'bg-blue-50', // Sürüklenen öğenin arkasında bırakacağı renk
+            animation: 150, 
+            handle: '.drag-handle', // Sadece noktalı ikondan tutulmasını sağlar
+            delay: 200, // Mobilde sürüklemeye başlamak için 200ms basılı tutmak gerekir
+            delayOnTouchOnly: true, // Gecikmeyi sadece dokunmatik ekranlarda uygular
+            ghostClass: 'bg-blue-50', 
             onEnd: function () {
-                // Sürükleme işlemi bittiğinde harita linkini otomatik güncelle
-                updateGoogleMapsLink();
+                updateGoogleMapsLink(); // Bırakıldığında harita linkini günceller
             }
         });
 
