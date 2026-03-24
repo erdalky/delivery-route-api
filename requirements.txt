@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+ortools
+openai
+requests
+pydantic
+
+# --- API KEYS ---
+GOOGLE_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', 'AIzaSyAhD5u5vkg2vpyOhXgv9jlTKIYwlmFuhK8')
+# Replace with your actual OpenAI Key
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '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')
