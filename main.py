@@ -9,7 +9,13 @@ from typing import List, Optional, Dict
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 from openai import OpenAI
+from fastapi.responses import HTMLResponse
 
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
+    
 # --- API KEYS ---
 GOOGLE_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
 # Replace with your actual OpenAI Key
