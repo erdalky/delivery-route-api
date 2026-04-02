@@ -11,7 +11,7 @@
         .dragging { opacity: 0.4; background-color: #e5e7eb; border: 2px dashed #9ca3af; }
         /* Mobilde liste öğelerinin üzerinde kazara seçim yapılmasını engeller */
         #routeList li {
-            touch-action: pan-y; /* Sadece dikey kaydırmaya izin ver, sürüklemeyi bozma */
+            touch-action: pan-y;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -30,18 +30,26 @@
         </div>
 
         <div class="p-6">
-            <div class="mb-5">
+            <div class="mb-4">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Locations (One per line)</label>
                 <textarea id="locations" rows="5"
                           class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 resize-none"
-                          placeholder="The University of Texas at Dallas, Richardson, TX&#10;Buc-ee's, Temple, TX&#10;The University of Texas at Austin, TX"></textarea>
+                          placeholder="Enter locations here..."></textarea>
             </div>
+
+            <button type="button" onclick="loadMiniatureHarvest()"
+                    class="w-full mb-5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-2.5 rounded-xl hover:bg-emerald-100 transition flex justify-center items-center gap-2 text-xs uppercase tracking-wider">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Miniature Harvest
+            </button>
 
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Departure Times (Optional)</label>
                 <input type="text" id="times"
                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50"
-                       placeholder="e.g., 07:45 14:30 (Leave blank for NOW)">
+                       placeholder="e.g., 07:45 14:30">
             </div>
 
             <button id="calcBtn" onclick="processRoute()"
@@ -75,6 +83,22 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <script>
+        // Otomatik adres yükleme fonksiyonu
+        function loadMiniatureHarvest() {
+            const addresses = [
+                "Sleep Inn Dallas Northwest – Irving",
+                "Pearl Sushi, TX",
+                "Le Margot, TX",
+                "Shady Oaks Country Club, TX",
+                "Wishbone & Flynt, TX",
+                "Stone House Restaurant, TX",
+                "Sear Steakhouse & Lounge, TX",
+                "Seven Doors Kitchen & Cocktails, TX",
+                "Texican Court, Valencia Hotel Collection, TX"
+            ];
+            document.getElementById('locations').value = addresses.join('\n');
+        }
+
         async function processRoute() {
             const locationsInput = document.getElementById('locations').value;
             const timesInput = document.getElementById('times').value;
@@ -97,7 +121,6 @@
             calcBtn.disabled = true;
 
             try {
-                // API URL: Aynı Render servisi olduğu için göreceli yol kullanıyoruz
                 const response = await fetch('/optimize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -149,7 +172,6 @@
             updateGoogleMapsLink();
         }
 
-        // --- SortableJS (Mevcut mantık korundu) ---
         new Sortable(document.getElementById("routeList"), {
             animation: 150,
             ghostClass: "dragging",
