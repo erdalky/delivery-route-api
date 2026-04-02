@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
+from pywrapcp = pywrapcp
 from openai import OpenAI
 from fastapi.responses import HTMLResponse
 
@@ -58,6 +58,8 @@ def get_google_distance_matrix(location_items: List[LocationItem], departure_tim
     }
     try:
         response = requests.get(url, params=params).json()
+        if response.get('status') != 'OK':
+            print(f"Google API Error: {response.get('status')} - {response.get('error_message', 'No message')}")
         return response if response.get('status') == 'OK' else None
     except:
         return None
@@ -79,7 +81,8 @@ def parse_matrix(data):
 # Solve Traveling Salesperson Problem (TSP)
 def solve_route(matrix, num_locations, forced_indices):
     try:
-        manager = pywrapcp.RoutingIndexManager(num_locations, 1, [0], [num_locations - 1])
+        from ortools.constraint_solver import pywrapcp
+        manager = pywrapcp.RoutingIndexManager(num_locations, 1, 0)
         routing = pywrapcp.RoutingModel(manager)
         
         def distance_callback(from_index, to_index):
@@ -102,7 +105,8 @@ def solve_route(matrix, num_locations, forced_indices):
             ordered_indices.append(manager.IndexToNode(index))
             return solution.ObjectiveValue(), ordered_indices
         return None, None
-    except:
+    except Exception as e:
+        print(f"Solver Error: {e}")
         return None, None
 
 # Generate AI tactical advice
@@ -149,7 +153,7 @@ def optimize_route(request: RouteRequest):
                 results.append({'time': label, 'duration': cost, 'indices': indices})
 
     if not results:
-        raise HTTPException(status_code=404, detail="No valid route found.")
+        raise HTTPException(status_code=404, detail="No valid route found. Ensure Distance Matrix API is enabled and billing is active.")
 
     # Select most efficient time and sequence
     best = min(results, key=lambda x: x['duration'])
