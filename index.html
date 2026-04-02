@@ -3,196 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Route Optimizer</title>
+    <title>Route Optimizer Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .dragging { opacity: 0.4; background-color: #e5e7eb; border: 2px dashed #9ca3af; }
-        /* Mobilde liste öğelerinin üzerinde kazara seçim yapılmasını engeller */
-        #routeList li {
-            touch-action: pan-y;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+        .drag-handle { cursor: grab; }
+        #locationList li { touch-action: pan-y; user-select: none; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-        <div class="bg-slate-900 px-6 py-5">
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                </svg>
-                Route Optimizer
-            </h1>
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+        <div class="bg-slate-900 px-6 py-6 text-center">
+            <h1 class="text-2xl font-bold text-white tracking-tight">Route Optimizer</h1>
+            <p class="text-blue-400 text-xs font-medium mt-1 uppercase">Powered by Place ID & AI</p>
         </div>
 
         <div class="p-6">
             <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Locations (One per line)</label>
-                <textarea id="locations" rows="5"
-                          class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 resize-none"
-                          placeholder="Enter locations here..."></textarea>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Add Location</label>
+                <div class="flex gap-2">
+                    <input id="autocomplete" type="text" 
+                           class="flex-1 border border-gray-300 rounded-xl p-3.5 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" 
+                           placeholder="Search restaurant or address...">
+                </div>
             </div>
 
+            <ul id="selectedLocations" class="mb-4 space-y-2"></ul>
+
             <button type="button" onclick="loadMiniatureHarvest()"
-                    class="w-full mb-5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-2.5 rounded-xl hover:bg-emerald-100 transition flex justify-center items-center gap-2 text-xs uppercase tracking-wider">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                Miniature Harvest
+                    class="w-full mb-6 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-3 rounded-xl hover:bg-emerald-100 transition flex justify-center items-center gap-2 text-xs uppercase tracking-widest">
+                🌱 Miniature Harvest
             </button>
 
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Departure Times (Optional)</label>
-                <input type="text" id="times"
-                       class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50"
-                       placeholder="e.g., 07:45 14:30">
+                <input type="text" id="times" class="w-full border border-gray-300 rounded-xl p-3.5 outline-none bg-gray-50 text-sm" placeholder="e.g., 08:00 14:00">
             </div>
 
-            <button id="calcBtn" onclick="processRoute()"
-                    class="w-full bg-blue-600 text-white font-semibold py-3.5 rounded-xl hover:bg-blue-700 transition shadow-md flex justify-center items-center gap-2">
-                <span id="btnText">Optimize Route</span>
-                <svg id="loadingIcon" class="hidden animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+            <button id="calcBtn" onclick="processRoute()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition shadow-lg flex justify-center items-center gap-2">
+                <span id="btnText">Optimize Strategy</span>
+                <svg id="loadingIcon" class="hidden animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             </button>
         </div>
 
         <div id="resultsArea" class="hidden bg-gray-50 p-6 border-t border-gray-200">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="text-lg font-bold text-slate-800">Suggested Route</h2>
-                <span id="durationBadge" class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200"></span>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-800">Optimal Route</h2>
+                <span id="durationBadge" class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full"></span>
             </div>
-            <ul id="routeList" class="space-y-2 mb-4"></ul>
-            
-            <div id="aiBox" class="mt-4 mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl hidden">
-                <div id="aiText" class="text-xs text-indigo-800 leading-relaxed whitespace-pre-wrap font-medium"></div>
+            <ul id="finalRouteList" class="space-y-2 mb-6"></ul>
+            <div id="aiBox" class="p-4 bg-white border border-blue-100 rounded-2xl shadow-sm mb-6 hidden">
+                <p id="aiText" class="text-xs text-slate-600 leading-relaxed"></p>
             </div>
-
-            <a id="mapsLink" href="#" target="_blank"
-               class="flex justify-center items-center gap-2 w-full bg-slate-800 text-white font-semibold py-3.5 rounded-xl hover:bg-slate-700 transition shadow-md">
-                Open in Google Maps
-            </a>
+            <a id="mapsLink" href="#" target="_blank" class="w-full bg-slate-800 text-white font-bold py-4 rounded-2xl flex justify-center items-center gap-2">GO TO MAPS</a>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-
     <script>
-        // Otomatik adres yükleme fonksiyonu
+        let selectedLocations = [];
+        let autocomplete;
+
+        // Google Autocomplete Başlatma
+        function initAutocomplete() {
+            autocomplete = new google.maps.places.Autocomplete(
+                document.getElementById('autocomplete'),
+                { types: ['establishment', 'geocode'], componentRestrictions: { country: 'us' } }
+            );
+
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (!place.place_id) return;
+                
+                selectedLocations.push({
+                    address: place.formatted_address,
+                    place_id: place.place_id,
+                    name: place.name
+                });
+                renderSelectedList();
+                document.getElementById('autocomplete').value = '';
+            });
+        }
+
+        function renderSelectedList() {
+            const list = document.getElementById('selectedLocations');
+            list.innerHTML = selectedLocations.map((loc, i) => `
+                <li class="bg-white border border-gray-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                    <span class="text-sm font-medium text-gray-700 truncate mr-2">${loc.name || loc.address}</span>
+                    <button onclick="removeLocation(${i})" class="text-red-400 hover:text-red-600 p-1">✕</button>
+                </li>
+            `).join('');
+        }
+
+        function removeLocation(index) {
+            selectedLocations.splice(index, 1);
+            renderSelectedList();
+        }
+
         function loadMiniatureHarvest() {
-            const addresses = [
-                "Sleep Inn Dallas Northwest – Irving",
-                "Pearl Sushi, TX",
-                "Le Margot, TX",
-                "Shady Oaks Country Club, TX",
-                "Wishbone & Flynt, TX",
-                "Stone House Restaurant, TX",
-                "Sear Steakhouse & Lounge, TX",
-                "Seven Doors Kitchen & Cocktails, TX",
-                "Texican Court, Valencia Hotel Collection, TX"
-            ];
-            document.getElementById('locations').value = addresses.join('\n');
+            // Örnek: Gerçek hayatta bu adresleri bir kez Place ID'ye çevirmek maliyeti düşürür
+            // Burada basitlik adına isimleri ekliyoruz, Autocomplete üzerinden seçmek en iyisidir
+            alert("Lütfen adresleri arama kutusundan tek tek seçin (Kesin sonuç için).");
         }
 
         async function processRoute() {
-            const locationsInput = document.getElementById('locations').value;
-            const timesInput = document.getElementById('times').value;
-
-            const locationsList = locationsInput.split('\n').map(loc => loc.trim()).filter(loc => loc !== '');
-            const timesList = timesInput.split(/[ ,]+/).filter(t => t !== '');
-
+            if (selectedLocations.length < 2) return alert("Add at least 2 locations.");
+            
             const btnText = document.getElementById('btnText');
             const loadingIcon = document.getElementById('loadingIcon');
-            const calcBtn = document.getElementById('calcBtn');
             const resultsArea = document.getElementById('resultsArea');
 
-            if (locationsList.length < 2) {
-                alert("Please enter at least 2 locations.");
-                return;
-            }
-
-            btnText.innerText = "Analyzing Route...";
+            btnText.innerText = "Calculating Traffic...";
             loadingIcon.classList.remove('hidden');
-            calcBtn.disabled = true;
 
             try {
                 const response = await fetch('/optimize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        locations: locationsList,
-                        forced_indices: [],
-                        times: timesList
+                        locations: selectedLocations.map(l => ({ address: l.address, place_id: l.place_id })),
+                        times: document.getElementById('times').value.split(/[ ,]+/).filter(t => t)
                     })
                 });
 
                 const data = await response.json();
-
                 if (response.ok) {
-                    renderResults(data.suggested_route, data.estimated_duration_mins, data.suggested_start_time, data.ai_insights);
+                    renderFinalResults(data);
                 } else {
-                    alert("API Error: " + (data.detail || "Unknown error"));
+                    alert(data.detail);
                 }
-            } catch (error) {
-                alert("Connection failed. Check if backend is live on Render.");
+            } catch (e) {
+                alert("Connection error.");
             } finally {
-                btnText.innerText = "Optimize Route";
+                btnText.innerText = "Optimize Strategy";
                 loadingIcon.classList.add('hidden');
-                calcBtn.disabled = false;
             }
         }
 
-        function renderResults(routeArray, duration, startTime, aiInsights) {
-            const resultsArea = document.getElementById('resultsArea');
-            const routeList = document.getElementById('routeList');
-            const aiBox = document.getElementById('aiBox');
-            const aiText = document.getElementById('aiText');
-
-            document.getElementById('durationBadge').innerText = `${duration} mins (Start: ${startTime})`;
-            routeList.innerHTML = '';
-
-            routeArray.forEach(addr => {
-                const li = document.createElement('li');
-                li.className = "bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 shadow-sm";
-                li.innerHTML = `<span class="address-text text-sm font-medium text-slate-700 flex-1">${addr}</span>`;
-                routeList.appendChild(li);
-            });
-
-            if (aiInsights) {
-                aiText.innerText = aiInsights;
-                aiBox.classList.remove('hidden');
-            }
-
-            resultsArea.classList.remove('hidden');
-            updateGoogleMapsLink();
-        }
-
-        new Sortable(document.getElementById("routeList"), {
-            animation: 150,
-            ghostClass: "dragging",
-            onEnd: updateGoogleMapsLink
-        });
-
-        function updateGoogleMapsLink() {
-            const items = document.querySelectorAll('#routeList .address-text');
-            const addresses = Array.from(items).map(item => encodeURIComponent(item.innerText.trim()));
-            if (addresses.length < 2) return;
-
-            const origin = addresses[0];
-            const destination = addresses[addresses.length - 1];
-            let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+        function renderFinalResults(data) {
+            document.getElementById('resultsArea').classList.remove('hidden');
+            document.getElementById('durationBadge').innerText = `${data.estimated_duration_mins} mins`;
             
-            if (addresses.length > 2) {
-                const waypoints = addresses.slice(1, -1).join('|');
-                url += `&waypoints=${waypoints}`;
+            const list = document.getElementById('finalRouteList');
+            list.innerHTML = data.suggested_route.map(addr => `
+                <li class="bg-white p-3 rounded-xl border-l-4 border-blue-500 shadow-sm text-sm text-slate-700">${addr}</li>
+            `).join('');
+
+            if (data.ai_insights) {
+                document.getElementById('aiBox').classList.remove('hidden');
+                document.getElementById('aiText').innerText = data.ai_insights;
             }
-            document.getElementById('mapsLink').href = url;
+
+            // Maps linkini en son adrese göre güncelle
+            const origin = encodeURIComponent(data.suggested_route[0]);
+            const dest = encodeURIComponent(data.suggested_route[data.suggested_route.length - 1]);
+            const waypoints = encodeURIComponent(data.suggested_route.slice(1, -1).join('|'));
+            document.getElementById('mapsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
         }
+
+        window.onload = initAutocomplete;
     </script>
 </body>
 </html>
