@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Route Optimizer Pro</title>
+    <title>Route Optimizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -13,6 +13,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         #selectedLocations li { touch-action: pan-y; user-select: none; }
         
+        /* Dropdown styling */
         .pac-container {
             z-index: 10000 !important;
             border-radius: 12px;
@@ -26,9 +27,8 @@
 <body class="min-h-screen flex items-center justify-center p-4">
 
     <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-        <div class="bg-slate-900 px-6 py-6 text-center">
+        <div class="bg-slate-900 px-6 py-8 text-center">
             <h1 class="text-2xl font-bold text-white tracking-tight">Route Optimizer</h1>
-            <p class="text-blue-400 text-xs font-medium mt-1 uppercase tracking-widest">Powered by Place ID & AI</p>
         </div>
 
         <div class="p-6">
@@ -76,6 +76,7 @@
         let selectedLocations = [];
         let autocomplete;
 
+        // Initialize Google Autocomplete
         function initAutocomplete() {
             autocomplete = new google.maps.places.Autocomplete(
                 document.getElementById('autocomplete'),
@@ -94,8 +95,8 @@
             });
         }
 
+        // Add verified location to array
         function addLocationData(place) {
-            // Aynı yerin tekrar eklenmesini engelle
             if (!selectedLocations.some(l => l.place_id === place.place_id)) {
                 selectedLocations.push({
                     address: place.formatted_address,
@@ -106,6 +107,7 @@
             }
         }
 
+        // Update UI list
         function renderSelectedList() {
             const list = document.getElementById('selectedLocations');
             list.innerHTML = selectedLocations.map((loc, i) => `
@@ -121,7 +123,7 @@
             renderSelectedList();
         }
 
-        // --- Miniature Harvest Otomatik Yükleme ---
+        // Auto-load preset addresses
         async function loadMiniatureHarvest() {
             const harvestBtn = document.getElementById('harvestBtn');
             const harvestText = document.getElementById('harvestText');
@@ -146,8 +148,7 @@
                         if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
                             addLocationData(results[0]);
                         }
-                        // API limitlerine takılmamak için küçük bir gecikme
-                        setTimeout(resolve, 200);
+                        setTimeout(resolve, 200); // Prevent rate limiting
                     });
                 });
             }
@@ -156,13 +157,14 @@
             harvestBtn.disabled = false;
         }
 
+        // Submit data to backend
         async function processRoute() {
-            if (selectedLocations.length < 2) return alert("Lütfen en az 2 durak ekleyin.");
+            if (selectedLocations.length < 2) return alert("Please add at least 2 stops.");
             
             const btnText = document.getElementById('btnText');
             const loadingIcon = document.getElementById('loadingIcon');
 
-            btnText.innerText = "Hesaplanıyor...";
+            btnText.innerText = "Calculating...";
             loadingIcon.classList.remove('hidden');
 
             try {
@@ -179,19 +181,20 @@
                 if (response.ok) {
                     renderFinalResults(data);
                 } else {
-                    alert("Hata: " + data.detail);
+                    alert("Error: " + data.detail);
                 }
             } catch (e) {
-                alert("Sunucu bağlantı hatası.");
+                alert("Server connection failed.");
             } finally {
                 btnText.innerText = "Optimize Strategy";
                 loadingIcon.classList.add('hidden');
             }
         }
 
+        // Display results from API
         function renderFinalResults(data) {
             document.getElementById('resultsArea').classList.remove('hidden');
-            document.getElementById('durationBadge').innerText = `${data.estimated_duration_mins} dk`;
+            document.getElementById('durationBadge').innerText = `${data.estimated_duration_mins} mins`;
             
             const list = document.getElementById('finalRouteList');
             list.innerHTML = data.suggested_route.map(addr => `
@@ -203,6 +206,7 @@
                 document.getElementById('aiText').innerText = data.ai_insights;
             }
 
+            // Generate external Maps link
             const origin = encodeURIComponent(data.suggested_route[0]);
             const dest = encodeURIComponent(data.suggested_route[data.suggested_route.length - 1]);
             const waypoints = encodeURIComponent(data.suggested_route.slice(1, -1).join('|'));

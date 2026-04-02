@@ -11,8 +11,10 @@ from ortools.constraint_solver import pywrapcp
 from openai import OpenAI
 from fastapi.responses import HTMLResponse
 
+# Initialize FastAPI
 app = FastAPI(title="Delivery Driver Route Assistant")
 
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,28 +23,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELS ---
+# Data models
 class LocationItem(BaseModel):
     address: str
     place_id: str
 
 class RouteRequest(BaseModel):
-    locations: List[LocationItem]  # String listesi yerine nesne listesi
+    locations: List[LocationItem]
     forced_indices: Optional[List[int]] = []
     times: Optional[List[str]] = []
 
-# --- API KEYS ---
+# API credentials
 GOOGLE_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Serve frontend
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
 
+# Fetch traffic data from Google
 def get_google_distance_matrix(location_items: List[LocationItem], departure_timestamp: float):
-    # Place ID kullanarak nokta atışı trafik verisi alıyoruz
     ids_str = "|".join([f"place_id:{item.place_id}" for item in location_items])
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
@@ -59,30 +62,36 @@ def get_google_distance_matrix(location_items: List[LocationItem], departure_tim
     except:
         return None
 
+# Extract durations from Google response
 def parse_matrix(data):
     matrix = []
     for row in data['rows']:
         row_list = []
         for element in row['elements']:
             if element.get('status') != 'OK':
-                row_list.append(9999999)
+                row_list.append(9999999) # High cost for invalid routes
             else:
                 duration = element.get('duration_in_traffic', element.get('duration'))
                 row_list.append(int(duration['value']) if duration else 0)
         matrix.append(row_list)
     return matrix
 
+# Solve Traveling Salesperson Problem (TSP)
 def solve_route(matrix, num_locations, forced_indices):
     try:
         manager = pywrapcp.RoutingIndexManager(num_locations, 1, [0], [num_locations - 1])
         routing = pywrapcp.RoutingModel(manager)
+        
         def distance_callback(from_index, to_index):
             return matrix[manager.IndexToNode(from_index)][manager.IndexToNode(to_index)]
+            
         transit_callback_index = routing.RegisterTransitCallback(distance_callback)
         routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+        
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
         search_parameters.time_limit.seconds = 3
+        
         solution = routing.SolveWithParameters(search_parameters)
         if solution:
             ordered_indices = []
@@ -96,6 +105,7 @@ def solve_route(matrix, num_locations, forced_indices):
     except:
         return None, None
 
+# Generate AI tactical advice
 def get_ai_delivery_insights(route_addresses: List[str], duration_mins: int, start_time: str) -> str:
     prompt = f"""
         You are a professional Delivery Dispatcher. 
@@ -109,12 +119,13 @@ def get_ai_delivery_insights(route_addresses: List[str], duration_mins: int, sta
     except:
         return "Tactical briefing unavailable."
 
+# Optimization endpoint
 @app.post("/optimize")
 def optimize_route(request: RouteRequest):
     if len(request.locations) < 2:
         raise HTTPException(status_code=400, detail="Minimum 2 locations required.")
 
-    # Tarih ayarları
+    # Setup timestamps for traffic analysis
     if not request.times:
         test_timestamps = [("Live Traffic", datetime.now().timestamp())]
     else:
@@ -127,6 +138,7 @@ def optimize_route(request: RouteRequest):
                 test_timestamps.append((dt.strftime('%H:%M'), dt.timestamp()))
             except: continue
 
+    # Evaluate route across requested time slots
     results = []
     for label, ts in test_timestamps:
         raw_data = get_google_distance_matrix(request.locations, ts)
@@ -139,6 +151,7 @@ def optimize_route(request: RouteRequest):
     if not results:
         raise HTTPException(status_code=404, detail="No valid route found.")
 
+    # Select most efficient time and sequence
     best = min(results, key=lambda x: x['duration'])
     final_ordered_locations = [request.locations[i].address for i in best['indices']]
     duration_mins = best['duration'] // 60
