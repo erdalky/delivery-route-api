@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,17 +11,14 @@
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .drag-handle { cursor: grab; }
         #selectedLocations li { touch-action: pan-y; user-select: none; }
         
-        /* Tahmin kutusunun tasarımını iyileştir ve en üste getir */
         .pac-container {
             z-index: 10000 !important;
             border-radius: 12px;
             margin-top: 5px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             border: none;
-            font-family: 'Inter', sans-serif;
         }
         .pac-item { padding: 10px; cursor: pointer; }
     </style>
@@ -47,9 +43,9 @@
 
             <ul id="selectedLocations" class="mb-4 space-y-2"></ul>
 
-            <button type="button" onclick="loadMiniatureHarvest()"
+            <button id="harvestBtn" type="button" onclick="loadMiniatureHarvest()"
                     class="w-full mb-6 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold py-3 rounded-xl hover:bg-emerald-100 transition flex justify-center items-center gap-2 text-xs uppercase tracking-widest">
-                🌱 Miniature Harvest
+                <span id="harvestText">🌱 Miniature Harvest</span>
             </button>
 
             <div class="mb-6">
@@ -86,28 +82,34 @@
                 { 
                     types: ['establishment', 'geocode'], 
                     componentRestrictions: { country: 'us' },
-                    fields: ['address_components', 'geometry', 'icon', 'name', 'place_id', 'formatted_address']
+                    fields: ['name', 'place_id', 'formatted_address']
                 }
             );
 
             autocomplete.addListener('place_changed', () => {
                 const place = autocomplete.getPlace();
                 if (!place.place_id) return;
-                
+                addLocationData(place);
+                document.getElementById('autocomplete').value = '';
+            });
+        }
+
+        function addLocationData(place) {
+            // Aynı yerin tekrar eklenmesini engelle
+            if (!selectedLocations.some(l => l.place_id === place.place_id)) {
                 selectedLocations.push({
                     address: place.formatted_address,
                     place_id: place.place_id,
                     name: place.name
                 });
                 renderSelectedList();
-                document.getElementById('autocomplete').value = '';
-            });
+            }
         }
 
         function renderSelectedList() {
             const list = document.getElementById('selectedLocations');
             list.innerHTML = selectedLocations.map((loc, i) => `
-                <li class="bg-white border border-gray-200 p-3 rounded-xl flex justify-between items-center shadow-sm animate-in fade-in slide-in-from-top-1">
+                <li class="bg-white border border-gray-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
                     <span class="text-sm font-medium text-gray-700 truncate mr-2">${loc.name || loc.address}</span>
                     <button onclick="removeLocation(${i})" class="text-red-400 hover:text-red-600 p-1">✕</button>
                 </li>
@@ -119,8 +121,39 @@
             renderSelectedList();
         }
 
-        function loadMiniatureHarvest() {
-            alert("Miniature Harvest adreslerini kesin doğruluk için arama kutusuna yazarak listeden seçin.");
+        // --- Miniature Harvest Otomatik Yükleme ---
+        async function loadMiniatureHarvest() {
+            const harvestBtn = document.getElementById('harvestBtn');
+            const harvestText = document.getElementById('harvestText');
+            
+            const addresses = [
+                "Sleep Inn Dallas Northwest – Irving", "Pearl Sushi, TX", "Le Margot, TX",
+                "Shady Oaks Country Club, TX", "Wishbone & Flynt, TX", "Stone House Restaurant, TX",
+                "Sear Steakhouse & Lounge, TX", "Seven Doors Kitchen & Cocktails, TX",
+                "Texican Court, Valencia Hotel Collection, TX"
+            ];
+
+            harvestText.innerText = "⌛ Loading Addresses...";
+            harvestBtn.disabled = true;
+
+            const service = new google.maps.places.PlacesService(document.createElement('div'));
+
+            for (const addr of addresses) {
+                const request = { query: addr, fields: ['name', 'formatted_address', 'place_id'] };
+                
+                await new Promise(resolve => {
+                    service.findPlaceFromQuery(request, (results, status) => {
+                        if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+                            addLocationData(results[0]);
+                        }
+                        // API limitlerine takılmamak için küçük bir gecikme
+                        setTimeout(resolve, 200);
+                    });
+                });
+            }
+
+            harvestText.innerText = "🌱 Miniature Harvest";
+            harvestBtn.disabled = false;
         }
 
         async function processRoute() {
@@ -128,7 +161,6 @@
             
             const btnText = document.getElementById('btnText');
             const loadingIcon = document.getElementById('loadingIcon');
-            const resultsArea = document.getElementById('resultsArea');
 
             btnText.innerText = "Hesaplanıyor...";
             loadingIcon.classList.remove('hidden');
@@ -138,7 +170,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        locations: selectedLocations.map(l => ({ address: l.address, place_id: l.place_id })),
+                        locations: selectedLocations,
                         times: document.getElementById('times').value.split(/[ ,]+/).filter(t => t)
                     })
                 });
