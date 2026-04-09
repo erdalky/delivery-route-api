@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBK-WMZn-5evKvOtH93VvlHkTfhGZZeDo0&libraries=places"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
@@ -22,6 +23,15 @@
             border: none;
         }
         .pac-item { padding: 10px; cursor: pointer; }
+
+        /* Sürükleme Stilleri */
+        .drag-handle { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
+        .dragging {
+            opacity: 0.5;
+            background-color: #eff6ff !important;
+            border: 2px solid #3b82f6 !important;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -64,7 +74,11 @@
                 <h2 class="text-lg font-bold text-slate-800">Optimal Route</h2>
                 <span id="durationBadge" class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full"></span>
             </div>
+            
+            <p class="text-[10px] text-gray-400 mb-3 italic">Tip: Drag the ≡ icon to reorder route manually.</p>
+            
             <ul id="finalRouteList" class="space-y-2 mb-6"></ul>
+            
             <div id="aiBox" class="p-4 bg-white border border-blue-100 rounded-2xl shadow-sm mb-6 hidden">
                 <p id="aiText" class="text-xs text-slate-600 leading-relaxed"></p>
             </div>
@@ -168,11 +182,12 @@
             loadingIcon.classList.remove('hidden');
 
             try {
+                // Not: Render URL'nizi buraya yazmayı unutmayın
                 const response = await fetch('/optimize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        locations: selectedLocations,
+                        locations: selectedLocations.map(l => l.address),
                         times: document.getElementById('times').value.split(/[ ,]+/).filter(t => t)
                     })
                 });
@@ -198,7 +213,14 @@
             
             const list = document.getElementById('finalRouteList');
             list.innerHTML = data.suggested_route.map(addr => `
-                <li class="bg-white p-3 rounded-xl border-l-4 border-blue-500 shadow-sm text-sm text-slate-700">${addr}</li>
+                <li class="bg-white p-3 rounded-xl border-l-4 border-blue-500 shadow-sm flex items-center gap-3">
+                    <div class="drag-handle text-gray-300">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                        </svg>
+                    </div>
+                    <span class="final-addr-text text-sm text-slate-700 leading-tight">${addr}</span>
+                </li>
             `).join('');
 
             if (data.ai_insights) {
@@ -206,11 +228,35 @@
                 document.getElementById('aiText').innerText = data.ai_insights;
             }
 
-            // Generate external Maps link
-            const origin = encodeURIComponent(data.suggested_route[0]);
-            const dest = encodeURIComponent(data.suggested_route[data.suggested_route.length - 1]);
-            const waypoints = encodeURIComponent(data.suggested_route.slice(1, -1).join('|'));
-            document.getElementById('mapsLink').href = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
+            // Init Sortable
+            new Sortable(list, {
+                animation: 150,
+                handle: '.drag-handle',
+                ghostClass: 'dragging',
+                delay: 100,
+                delayOnTouchOnly: true,
+                onEnd: updateDynamicMapsLink
+            });
+
+            updateDynamicMapsLink();
+        }
+
+        // Sürükleme sonrası linki günceller
+        function updateDynamicMapsLink() {
+            const addrElements = document.querySelectorAll('.final-addr-text');
+            const addresses = Array.from(addrElements).map(el => el.innerText);
+            
+            if (addresses.length < 2) return;
+
+            const origin = encodeURIComponent(addresses[0]);
+            const dest = encodeURIComponent(addresses[addresses.length - 1]);
+            let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+            
+            if (addresses.length > 2) {
+                const waypoints = encodeURIComponent(addresses.slice(1, -1).join('|'));
+                url += `&waypoints=${waypoints}`;
+            }
+            document.getElementById('mapsLink').href = url;
         }
 
         window.onload = initAutocomplete;
