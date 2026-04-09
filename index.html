@@ -14,7 +14,6 @@
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         #selectedLocations li { touch-action: pan-y; user-select: none; }
         
-        /* Dropdown styling */
         .pac-container {
             z-index: 10000 !important;
             border-radius: 12px;
@@ -24,7 +23,6 @@
         }
         .pac-item { padding: 10px; cursor: pointer; }
 
-        /* Sürükleme Stilleri */
         .drag-handle { cursor: grab; }
         .drag-handle:active { cursor: grabbing; }
         .dragging {
@@ -165,7 +163,7 @@
             harvestBtn.disabled = false;
         }
 
-        // --- GÜNCELLENEN KISIM ---
+        // --- DÜZELTİLEN FONKSİYON ---
         async function processRoute() {
             if (selectedLocations.length < 2) return alert("Please add at least 2 stops.");
             
@@ -176,12 +174,12 @@
             loadingIcon.classList.remove('hidden');
 
             try {
-                // Render URL'sini tam olarak yazdık
                 const response = await fetch('https://delivery-route-api-26zc.onrender.com/optimize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        locations: selectedLocations.map(l => l.address),
+                        // Backend Liste içinde Obje beklediği için selectedLocations'ı direkt gönderiyoruz
+                        locations: selectedLocations, 
                         times: document.getElementById('times').value.split(/[ ,]+/).filter(t => t)
                     })
                 });
@@ -191,12 +189,12 @@
                 if (response.ok) {
                     renderFinalResults(data);
                 } else {
-                    // [object Object] hatasını önlemek için JSON.stringify ekledik
-                    const errorMsg = JSON.stringify(data.detail || data);
-                    alert("API Error: " + errorMsg);
+                    // Hata mesajını düzgünce string'e çevirip gösteriyoruz
+                    const detail = typeof data.detail === 'object' ? JSON.stringify(data.detail, null, 2) : data.detail;
+                    alert("API Error: " + (detail || "Unknown error"));
                 }
             } catch (e) {
-                alert("Connection failed. Please check your URL or Internet.");
+                alert("Connection failed. Check your Internet or Backend URL.");
             } finally {
                 btnText.innerText = "Optimize Strategy";
                 loadingIcon.classList.add('hidden');
@@ -244,6 +242,7 @@
 
             const origin = encodeURIComponent(addresses[0]);
             const dest = encodeURIComponent(addresses[addresses.length - 1]);
+            // URL formatı Google standartlarına göre düzeltildi
             let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
             
             if (addresses.length > 2) {
