@@ -70,7 +70,7 @@ async function processRoute() {
     btnText.innerText = "Optimizing...";
 
     try {
-        const response = await fetch('YOUR_BACKEND_URL/optimize', {
+        const response = await fetch('https://delivery-route-api-26zc.onrender.com/optimize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ locations: selectedLocations })
