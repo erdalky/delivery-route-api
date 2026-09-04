@@ -6,8 +6,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
 from fastapi.responses import HTMLResponse
 
 # Initialize FastAPI
@@ -40,6 +38,10 @@ GOOGLE_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
 async def read_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
+
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 # Fetch traffic data from Google
 def get_google_distance_matrix(location_items: List[LocationItem], departure_timestamp: float):
@@ -76,6 +78,8 @@ def parse_matrix(data):
 
 # Solve Traveling Salesperson Problem (TSP)
 def solve_route(matrix, num_locations, forced_indices):
+    from ortools.constraint_solver import routing_enums_pb2
+    from ortools.constraint_solver import pywrapcp
     try:
         manager = pywrapcp.RoutingIndexManager(num_locations, 1, [0], [num_locations - 1])
         routing = pywrapcp.RoutingModel(manager)
