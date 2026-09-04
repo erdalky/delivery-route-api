@@ -56,8 +56,9 @@ def get_google_distance_matrix(location_items: List[LocationItem], departure_tim
     try:
         response = requests.get(url, params=params).json()
         return response if response.get('status') == 'OK' else None
-    except:
-        return None
+    except Exception as e:
+        print("İSTEK HATASI:", repr(e))
+    return None
 
 # Extract durations from Google response
 def parse_matrix(data):

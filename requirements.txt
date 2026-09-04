@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 ortools
-openai
 requests
 pydantic
